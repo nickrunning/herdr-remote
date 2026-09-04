@@ -191,6 +191,45 @@ class WebConnectionTests(unittest.TestCase):
         self.assertFalse(state[1]["closedByApp"])
         self.assertEqual(self.page.evaluate("() => __conn()"), "live")
 
+    # --- and the page waking up ---
+
+    def test_coming_back_to_the_foreground_reconnects_at_once(self):
+        """A phone waking spends the 3s backoff in the foreground, and a timer chain that ran
+        while hidden may have been throttled to once a minute. Visible with a dead socket is
+        the one moment the reader is waiting, so it must not wait for the timer at all."""
+        self.page.evaluate("() => __drop(0)")
+        self.assertEqual(self.page.evaluate("() => __conn()"), "offline")
+        self.page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        # 1s < the 3s backoff: passing here proves the reconnect did not come from the timer.
+        self.page.wait_for_function("() => window.__sockets.length === 2", timeout=1000)
+        self.page.evaluate("() => __open(1)")
+        self.assertEqual(self.page.evaluate("() => __conn()"), "live")
+        self.page.wait_for_timeout(PAST_RECONNECT)
+        state = self.page.evaluate("() => __state()")
+        self.assertEqual(len(state), 2, "the scheduled reconnect survived the foreground one: %s" % state)
+        self.assertFalse(state[1]["closedByApp"])
+
+    def test_coming_back_to_the_foreground_keeps_a_live_socket(self):
+        """Every trip to the home screen fires visibilitychange; a healthy socket must not be
+        torn down and rebuilt by each one."""
+        self.page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        self.page.wait_for_timeout(PAST_RECONNECT)
+        state = self.page.evaluate("() => __state()")
+        self.assertEqual(len(state), 1, "the live socket was replaced: %s" % state)
+        self.assertFalse(state[0]["closedByApp"])
+        self.assertEqual(self.page.evaluate("() => __conn()"), "live")
+
+    def test_an_error_without_a_close_still_schedules_a_reconnect(self):
+        """The spec owes a close after every error, but the wake-from-suspension path is where
+        that delivery is missed -- and without one, the app sits offline until a reload."""
+        self.page.evaluate(
+            "() => { const s = __sock(0); s.readyState = 3; if (s.onerror) s.onerror({}); }"
+        )
+        self.assertEqual(self.page.evaluate("() => __conn()"), "offline")
+        self.page.wait_for_function("() => window.__sockets.length === 2", timeout=6000)
+        self.page.evaluate("() => __open(1)")
+        self.assertEqual(self.page.evaluate("() => __conn()"), "live")
+
 
 if __name__ == "__main__":
     unittest.main()

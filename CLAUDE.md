@@ -599,6 +599,22 @@ ordering in a browser against a stand-in socket; four of its five tests fail on 
 replaced, and the fifth — a dropped socket still reconnecting — is what stops the guard from
 becoming a way of switching reconnection off.
 
+**The 3s backoff is the background's, not the foreground's.** The OS drops the socket while the
+page is suspended — the relay's own keepalive (`websockets` pings every 20s, drop after 20s of
+silence, at `herdr_relay.py`'s unpinned defaults) closes it server-side inside a minute — and the
+close is only *delivered* on wake, so the timer starts fresh at 3s in exactly the moment the reader
+is waiting; a timer chain that kept running while hidden has been throttled by Android to once a
+minute, which can put the next attempt tens of seconds away. So a `visibilitychange` back to
+visible reconnects at once when the socket is CLOSING or CLOSED (`ws.readyState >=
+WebSocket.CLOSING`), and only then — it goes through `connect()`, so it cannot fork the chain, and
+a live socket survives every trip to the home screen; one still CONNECTING is left alone, because
+it either completes or its own timeout fires `onclose`. `onerror` arms the reconnect too: the spec
+owes a close after every error, but the wake-from-suspension path is where that delivery is
+missed, and without it the app sits offline until a reload. The wake path adds three tests to the
+file: the foreground reconnect must land inside 1s — under the backoff, so it cannot be the timer
+that did it — and the other two hold the guard sides (a live socket not rebuilt, an error without
+a close still reconnecting).
+
 ## WebSocket Protocol
 
 Messages are JSON with a `type` field:

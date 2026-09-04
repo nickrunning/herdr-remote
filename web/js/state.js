@@ -288,7 +288,11 @@ function connect() {
   ws = sock;
   sock.onopen = () => { if (ws !== sock) return; setStatus('connected'); if(window.cue) cue('ready'); };
   sock.onclose = () => { if (ws !== sock) return; setStatus('disconnected'); scheduleReconnect(); };
-  sock.onerror = () => { if (ws !== sock) return; setStatus('disconnected'); };
+  // The spec owes an onclose after every onerror, but a page waking from suspension is exactly
+  // where that delivery is missed -- and without a close, scheduleReconnect is never reached and
+  // the app sits offline until a reload. So the error arms the timer too; a following close just
+  // re-arms it.
+  sock.onerror = () => { if (ws !== sock) return; setStatus('disconnected'); scheduleReconnect(); };
   sock.onmessage = (e) => { if (ws !== sock) return; handleMessage(JSON.parse(e.data)); };
 }
 
@@ -296,6 +300,20 @@ function scheduleReconnect() {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 3000);
 }
+
+// The 3s backoff above is for the page's own sake while it sits in the background, but the page
+// wakes into the one moment the reader is actually waiting on this socket -- and there the backoff
+// is paid in full: onclose is only *delivered* on wake, so the timer starts fresh at 3s, and on
+// Android a timer chain that kept running while hidden has been throttled to once a minute, which
+// can put the next attempt tens of seconds away. So a return to the foreground reconnects at once
+// when the socket is CLOSING or CLOSED. connect() clears any pending reconnectTimer and detaches
+// the old socket's handlers before opening a new one, so this cannot fork the chain (measured in
+// test_a_manual_connect_does_not_fork_the_reconnect_chain). A socket still CONNECTING is left
+// alone: it either completes or its own timeout fires onclose, which re-enters this path.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!ws || ws.readyState >= WebSocket.CLOSING) connect();
+});
 
 function setStatus(s) {
   const dot = document.getElementById('statusDot');
