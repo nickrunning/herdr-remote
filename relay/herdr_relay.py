@@ -1441,6 +1441,24 @@ def pane_process(pane_id, remote=None):
     return {"name": name[:64], "cmdline": (foreground.get("cmdline") or "").strip()[:200]}
 
 
+def session_from_pane_process(pane_id, remote=None):
+    """The claude session a pane's own process names, for a pane herdr reports no ref for.
+
+    One CLI call plus, on a remote host, one SSH round trip, so it runs when a client asks for
+    history and never on the poll. It is looked up each time because /clear changes the session,
+    and the answer stays out of pane_session_map because the upload sweep reads that map as what
+    herdr reported.
+    """
+    raw = run_herdr("pane", "process-info", "--pane", pane_id, remote=remote)
+    try:
+        processes = json.loads(raw)["result"]["process_info"]["foreground_processes"]
+        pids = [process.get("pid") for process in processes]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return transcript.claude_session_from_pids(
+        pids, remote=remote, ssh_args=SSH_BASE_ARGS, remote_runner=transcript_ssh)
+
+
 def pane_layout(pane_id, remote=None):
     """`pane layout` for the tab holding a pane: every pane's rect plus which one is focused."""
     raw = run_herdr("pane", "layout", "--pane", pane_id, remote=remote)
@@ -3936,12 +3954,17 @@ async def handle_client(ws):
                     continue
                 remote = pane_remote_map.get(pane_id)
                 pane = agent_cache.get(pane_id) or {}
+                session = pane_session_map.get(pane_id)
+                if session is None and pane.get("agent") == "claude" and transcript.ENABLED:
+                    session = await asyncio.to_thread(
+                        session_from_pane_process, pane_id, remote=remote
+                    )
                 # Off the event loop: a cold read of the biggest transcript on this machine (33MB)
                 # measured 0.29s, and a remote one is an SSH round trip. Neighbouring handlers
                 # block the loop on their subprocess; this one is too slow to join them.
                 body = await asyncio.to_thread(
                     transcript.history,
-                    pane_session_map.get(pane_id),
+                    session,
                     remote=remote,
                     limit=limit,
                     before=before or None,

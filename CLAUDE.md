@@ -237,7 +237,7 @@ taller than a chip would make the header jump every time the filter opened. Clos
 conversation with pieces missing — and a fresh page closes it, so a needle cannot survive into the
 next conversation.
 
-The list carries **`overscroll-behavior: contain`**, for the same reason `.term-content` does: at
+The list carries **`overscroll-behavior: contain`**, for the same reason `.term-scroll` does: at
 the top of it a downward drag chained to the document and handed Chrome its pull-to-refresh, which
 reloads the whole app — losing the open session, the panel, and however far back you had paged. The
 two are asserted together so they cannot drift apart.
@@ -326,6 +326,34 @@ moved, and `scrollTop === 0` is true for the whole of a sideways drag — perman
 output is shorter than the box. Measured: one wheel right took the read from 200 lines to 600 and
 the next to 1000, each answer a wholesale different content, and `loadMore` reaches `refreshPane`
 directly so the tick's own guard never saw it.
+
+**Arriving at the top of an agent pane brings the conversation in above the output**
+(`#termInlineHistory`), so scrolling up works without opening the panel. `#termScroll` is the vertical
+scroller and holds both; `#termContent` holds only the mirror, so `mirrorPatch` and `doSearch` still
+see nothing but terminal text.
+
+- **The mirror scrolls sideways alone, and `overscroll-behavior` on it is x-only.** With `contain` on
+  both axes, a pane holding one long line swallowed every vertical drag before it reached the
+  scroller. A test that sets `scrollTop` cannot see this, so `RealGestureTests` uses real wheel input.
+- **It is the panel's list, not a second one.** Both views draw `history_`, so there is one request
+  stream and no question of whose answer a `history` message is. Opening the panel over it reuses
+  what is loaded rather than resetting the reader's place.
+- **An agent's transcript comes before its ring.** The first arrival asks for history; only an
+  `unavailable` answer falls back to `loadMore`, and that verdict is kept until a real switch. With
+  nothing left to load, the reason is shown above the output. A terminal pages its ring as before.
+- **Returning to the bottom puts it away,** and the next arrival fetches the newest page. A kept page
+  would leave a silent gap between its last turn and the live screen. `armed` stops this firing on
+  landing, since a mirror barely taller than its box is already within 50px of the bottom at its top.
+- **A reader in the history is not moved by a tick.** The mirror is below them, so the "keep distance
+  from the bottom" fix-up is skipped; a render anchors on that same distance so turns can land above.
+- **The turns are dark under every theme,** because they read as one page with the mirror. `.term-inline`
+  restates the dark palette's values, since a custom palette sets the tokens on the root as plain
+  colours and its dark text would land on the dark ground. The panel keeps the app's theme.
+- **A short mirror cannot scroll,** so on a tall desktop window no scroll event ever fires. A wheel-up
+  or a downward drag over it makes the first request instead.
+
+`tests/test_web_inline_history.py` measures all of it. For touch by hand, `Input.dispatchTouchEvent`
+drives a real drag; `Input.synthesizeScrollGesture` moved nothing here even on a page that scrolls.
 
 **A switch empties the mirror** (`clearPaneMirror`), because until the new pane's read lands there
 is nothing true to put there. The read is a relay round trip — milliseconds locally, an SSH hop and
@@ -635,8 +663,9 @@ live activity, not a session name: a working claude sets it to what it is doing,
 `activity_title` drops the harness's own banner, which is all an idle or done pane leaves there.
 The durable title comes back from `get_history`), `status`, `cwd`, `project`, `host`, `remote`,
 `workspace_id`, `tab_id`, `focused` (the one pane per host herdr itself has in front),
-`scrollback` + `viewport_rows` (from herdr's `scroll`), `has_session` (this pane names an agent
-transcript), `order` (see below), and `last_active_at` / `last_seen_at` (epoch **milliseconds**,
+`scrollback` + `viewport_rows` (from herdr's `scroll`), `has_session` (herdr reports an agent
+session for this pane; `false` does not mean history is unreadable, see the transcript reader),
+`order` (see below), and `last_active_at` / `last_seen_at` (epoch **milliseconds**,
 because every client that will compare them is JavaScript). The session ref itself stays
 server-side in `pane_session_map`. The message itself also carries `upload_max_bytes` when the
 relay takes uploads, and omits it when `HERDR_UPLOADS=0`.
@@ -1165,6 +1194,21 @@ Only its canonical `response_item` messages and tool calls/results are read: `ev
 reasoning, and developer/system context are dropped. Id-less items use a row hash for stable
 pagination cursors across tail reads. SSH reads currently have path shapes for Claude and Codex;
 other harnesses explicitly report `unsupported` remotely rather than probing Claude's tree.
+
+**A Claude pane with no session ref is looked up by pid when a client asks for history.** herdr
+reported no `agent_session` for 12 of the 17 Claude panes measured on this host. Every one of them
+still had a transcript: `pane process-info` gives the foreground pid, and Claude writes the session
+id to `~/.claude/sessions/<pid>.json`. The web app therefore shows the History button on every agent
+pane and hides it only on a terminal.
+
+- **herdr's ref wins when there is one.** On one pane the pid file named a 1.9KB stub while herdr's
+  ref named the real 1.2MB conversation.
+- **The lookup runs per `get_history`, never on the poll,** since it costs one CLI call plus, on a
+  remote host, one SSH round trip. It is not cached, because `/clear` changes the session.
+- **The result stays out of `pane_session_map`,** because the upload sweep reads that map as what
+  herdr reported. `has_session` also stays `false`.
+- **The pid file is undocumented.** Anything unexpected in it answers `no-session`, not an error.
+  The remote path has unit tests only; no remote host was available to run it against.
 
 Claude measurements on the 196 transcripts on this machine (327MB, largest file 33.4MB):
 

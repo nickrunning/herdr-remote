@@ -19,6 +19,7 @@ import glob
 import hashlib
 import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -849,6 +850,81 @@ def _default_remote_runner(remote, script, ssh_args=()):
     cmd = ["ssh", *ssh_args, remote, "sh -c " + shlex.quote(script)]
     proc = subprocess.run(cmd, capture_output=True, timeout=REMOTE_TIMEOUT)
     return proc.returncode, proc.stdout
+
+
+# ---------------------------------------------------------------------------- finding a session by pid
+
+# herdr reports no agent_session for most claude panes (12 of the 17 measured on one host), but
+# claude writes `<config dir>/sessions/<pid>.json` for each running process, with the session id
+# inside. All 17 led to a transcript that exists. It is an undocumented file and it is not always
+# the better answer: on one pane it named a 1.9KB stub where herdr's ref named the real 1.2MB
+# conversation. So this only ever fills in for a missing ref, and anything unexpected in the file
+# means "no session" rather than an error.
+
+
+def _session_ref_from_pid_file(pid, blob):
+    try:
+        record = json.loads(blob)
+    except ValueError:
+        return None
+    if not isinstance(record, dict) or record.get("pid") != pid:
+        return None
+    value = record.get("sessionId")
+    if not isinstance(value, str) or not UUID_RE.match(value):
+        return None
+    return {"agent": "claude", "kind": "id", "value": value}
+
+
+def _usable_pids(pids):
+    # `bool` is an int in python, and a pid ends up inside a path and a remote shell script.
+    return [pid for pid in pids if type(pid) is int and pid > 0]
+
+
+def _session_ref_from_remote_pids(pids, roots, ssh_args, remote, remote_runner):
+    # Unquoted for the same reason as remote_probe_script: `$HOME` has to reach the far shell.
+    dirs = [posixpath.dirname(root.rstrip("/")) + "/sessions" for root in roots
+            if REMOTE_ROOT_RE.match(root)]
+    if not pids or not dirs:
+        return None
+    candidates = " ".join(f"{folder}/$p.json" for folder in dirs)
+    script = (
+        f'for p in {" ".join(str(pid) for pid in pids)}; do '
+        f'for f in {candidates}; do '
+        '[ -r "$f" ] && { echo "$p"; cat "$f"; exit 0; }; '
+        'done; done'
+    )
+    try:
+        code, out = (remote_runner or _default_remote_runner)(remote, script, ssh_args)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if code != 0:
+        return None
+    pid, _, blob = out.partition(b"\n")
+    try:
+        answered = int(pid)
+    except ValueError:
+        return None
+    return _session_ref_from_pid_file(answered, blob) if answered in pids else None
+
+
+def claude_session_from_pids(pids, roots=None, remote=None, ssh_args=(), remote_runner=None):
+    """A session ref for the first of these processes that has a claude pid file, or None."""
+    pids = _usable_pids(pids)
+    if remote:
+        return _session_ref_from_remote_pids(
+            pids, roots if roots is not None else REMOTE_ROOTS, ssh_args, remote, remote_runner)
+    for pid in pids:
+        for root in (roots if roots is not None else LOCAL_ROOTS):
+            folder = os.path.dirname(os.path.expanduser(root).rstrip(os.sep))
+            try:
+                with open(os.path.join(folder, "sessions", f"{pid}.json"), "rb") as handle:
+                    blob = handle.read()
+            except OSError:
+                continue
+            ref = _session_ref_from_pid_file(pid, blob)
+            if ref:
+                return ref
+    return None
 
 
 # ---------------------------------------------------------------------------- reading

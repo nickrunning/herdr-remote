@@ -476,7 +476,7 @@ class WebHistoryPanelTests(unittest.TestCase):
         self.open_panel()
         body, term = self.page.evaluate("""() => [
           getComputedStyle(document.getElementById('historyContent')).overscrollBehaviorY,
-          getComputedStyle(document.getElementById('termContent')).overscrollBehaviorY]""")
+          getComputedStyle(document.getElementById('termScroll')).overscrollBehaviorY]""")
         self.assertEqual(body, "contain")
         self.assertEqual(body, term)
 

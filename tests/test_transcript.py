@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -430,6 +431,92 @@ class LocateTests(unittest.TestCase):
         body = transcript.history({"kind": "id", "value": SESSION, "agent": "opencode"})
         self.assertEqual(body["unavailable"], "unsupported")
         self.assertEqual(body["agent"], "opencode")
+
+
+class SessionFromPidTests(unittest.TestCase):
+    """herdr reports no session for most claude panes; claude's own pid file still names one."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "projects"
+        self.root.mkdir()
+        self.sessions = Path(tmp.name) / "sessions"
+        self.sessions.mkdir()
+
+    def write(self, pid, **fields):
+        (self.sessions / f"{pid}.json").write_text(
+            json.dumps({"pid": pid, "sessionId": SESSION, **fields}), encoding="utf-8")
+
+    def lookup(self, pids):
+        return transcript.claude_session_from_pids(pids, roots=[str(self.root)])
+
+    def test_a_pid_file_becomes_a_ref_history_accepts(self):
+        self.write(42)
+        self.assertEqual(self.lookup([42]), {"agent": "claude", "kind": "id", "value": SESSION})
+
+    def test_every_foreground_process_is_tried(self):
+        """Measured: a claude pane can hold three foreground processes at once."""
+        self.write(43)
+        self.assertEqual(self.lookup([41, 42, 43])["value"], SESSION)
+
+    def test_a_file_that_cannot_be_trusted_names_nothing(self):
+        cases = {
+            "another process": json.dumps({"pid": 7, "sessionId": SESSION}),
+            "not a uuid": json.dumps({"pid": 42, "sessionId": "../../etc/passwd"}),
+            "no session": json.dumps({"pid": 42}),
+            "not an object": "[]",
+            "not json": "{half a file",
+        }
+        for name, content in cases.items():
+            with self.subTest(name):
+                (self.sessions / "42.json").write_text(content, encoding="utf-8")
+                self.assertIsNone(self.lookup([42]))
+
+    def test_a_missing_file_or_a_bad_pid_names_nothing(self):
+        self.write(42)
+        for pids in ([], [41], ["42"], [True], [-42], [None]):
+            with self.subTest(pids=pids):
+                self.assertIsNone(self.lookup(pids))
+
+    def test_a_remote_lookup_reads_the_far_hosts_file_in_one_round_trip(self):
+        seen = []
+
+        def runner(remote, script, ssh_args=()):
+            seen.append((remote, script, ssh_args))
+            return 0, ("42\n" + json.dumps({"pid": 42, "sessionId": SESSION})).encode()
+
+        ref = transcript.claude_session_from_pids(
+            [41, 42], remote="box", ssh_args=("-x",), remote_runner=runner)
+        self.assertEqual(ref["value"], SESSION)
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0][0], "box")
+        self.assertEqual(seen[0][2], ("-x",))
+        self.assertIn("$HOME/.claude/sessions", seen[0][1])
+
+    def test_a_remote_pid_is_never_anything_but_an_integer(self):
+        runner = mock.Mock(return_value=(0, b""))
+        self.assertIsNone(transcript.claude_session_from_pids(
+            ["1; rm -rf ~"], remote="box", remote_runner=runner))
+        runner.assert_not_called()
+
+    def test_a_remote_answer_that_cannot_be_trusted_names_nothing(self):
+        body = json.dumps({"pid": 42, "sessionId": SESSION})
+        for name, result in {
+            "ssh failed": (255, b""),
+            "nothing found": (0, b""),
+            "pid not asked for": (0, ("9\n" + body).encode()),
+            "file for another pid": (0, ("41\n" + body).encode()),
+        }.items():
+            with self.subTest(name):
+                runner = mock.Mock(return_value=result)
+                self.assertIsNone(transcript.claude_session_from_pids(
+                    [41, 42], remote="box", remote_runner=runner))
+
+    def test_a_remote_timeout_names_nothing_rather_than_raising(self):
+        runner = mock.Mock(side_effect=subprocess.TimeoutExpired("ssh", 1))
+        self.assertIsNone(transcript.claude_session_from_pids(
+            [42], remote="box", remote_runner=runner))
 
 
 class ReadAndCacheTests(unittest.TestCase):

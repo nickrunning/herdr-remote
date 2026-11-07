@@ -59,6 +59,11 @@ also carries that host's transcripts to the client.
   own environment (`HERDR_CLAUDE_ROOTS`, `HERDR_REMOTE_CLAUDE_ROOTS`) and the uuid must match
   `^[0-9a-f]{8}-...-[0-9a-f]{12}$`. Clients send a `pane_id`, never a path or a session id, and the
   relay resolves it through state it built from `herdr pane list`.
+- When herdr reports no session for a Claude pane, the relay looks one up from the pane's own
+  foreground process: `herdr pane process-info` gives the pid, and `sessions/<pid>.json` beside the
+  Claude root gives the session id, held to the same uuid rule. So a client can read the transcript
+  of any Claude pane it can address, not only the panes herdr names a session for. Only the id is
+  taken from that file, and nothing else in it reaches a client.
 - Codex UUID refs locate `rollout-*.jsonl` files under the configured session roots
   (`HERDR_CODEX_ROOTS`, default `$CODEX_HOME/sessions` or `~/.codex/sessions`).
   Local symlinks cannot escape those roots. SSH reads use `HERDR_REMOTE_CODEX_ROOTS`

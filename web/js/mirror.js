@@ -306,7 +306,15 @@ function toggleHistory() {
   positionHistoryPanel();
   hideSearch(); // the two share the space under the header
   navPush('history', hideHistory);
-  loadHistory();
+  // The conversation above the output is the same list, freshly fetched. Reloading it here would
+  // empty that view and lose the reader's place in it for when this panel closes.
+  if (inlineHistory.open) {
+    renderHistory();
+    const body = document.getElementById('historyContent');
+    body.scrollTop = body.scrollHeight;
+  } else {
+    loadHistory();
+  }
 }
 
 function hideHistory() {
@@ -335,8 +343,9 @@ function loadHistory(before) {
     document.getElementById('historyContent').innerHTML = '<div class="hist-edge">Loading…</div>';
   } else {
     history_.loading = true;
-    renderHistory();
+    renderHistoryViews();
   }
+  if (!before && inlineHistory.open) renderInlineHistory();
   ws.send(JSON.stringify({
     type: 'get_history', pane_id: activePane, limit: HISTORY_PAGE,
     include_tools: history_.tools, ...(before ? { before } : {}),
@@ -402,14 +411,133 @@ function receiveHistory(msg) {
   // Anchor on content, not on offset: prepending older turns would otherwise yank the page out
   // from under the reader's thumb.
   const previousHeight = el.scrollHeight, previousTop = el.scrollTop;
-  renderHistory();
+  renderHistoryViews();
   if (older) el.scrollTop = previousTop + (el.scrollHeight - previousHeight);
   else el.scrollTop = el.scrollHeight;  // newest turn is at the bottom
+  // After the views, so the fallback's own request is not sent while this answer is half applied.
+  if (inlineHistory.open && history_.unavailable) inlineHistoryUnavailable(history_.unavailable);
+}
+
+// Whichever of the two views is on screen. A page is hundreds of turns, and building them twice for
+// a panel nobody can see is the cost this avoids.
+function renderHistoryViews() {
+  if (document.getElementById('termHistory').style.display !== 'none') renderHistory();
+  if (inlineHistory.open) renderInlineHistory();
+}
+
+// ---- the conversation above the terminal output --------------------------------------------------
+//
+// An agent pane usually has one screen of output and nothing behind it, so arriving at the top of it
+// brings in the transcript. It is the panel's list (`history_`), shown a second way, so there is one
+// request stream and no question of whose answer a `history` message is.
+//
+// It goes away when the reader returns to the bottom. A page kept for the next visit would leave a
+// silent gap between its last turn and the live screen, so the next visit fetches the newest again.
+const inlineHistory = {
+  open: false,
+  // Set once the reader has been away from the bottom. Without it, a mirror barely taller than its
+  // box is already "at the bottom" at its own top, and the page would close the moment it landed.
+  armed: false,
+  // Why this pane has no transcript, once a relay has said. Cleared only by a real switch.
+  reason: null,
+  hint: false,
+};
+
+// Measured from the bottom because that is what stays put: everything rendered here goes in above
+// the output, and the reader's place is the distance down to the end of it.
+function renderInlineHistory() {
+  const box = document.getElementById('termInlineHistory');
+  const scroller = document.getElementById('termScroll');
+  const fromBottom = scroller.scrollHeight - scroller.scrollTop;
+  if (inlineHistory.open) {
+    const out = document.createDocumentFragment();
+    if (history_.turns.length) out.appendChild(historyListFragment(history_.turns));
+    else out.appendChild(histEdge(history_.loading ? 'Loading…' : 'This conversation has no turns yet.'));
+    const seam = document.createElement('div');
+    seam.className = 'hist-live';
+    seam.textContent = 'Live terminal';
+    out.appendChild(seam);
+    box.replaceChildren(out);
+  } else if (inlineHistory.hint) {
+    box.replaceChildren(histEdge(HISTORY_UNAVAILABLE[inlineHistory.reason] || 'Conversation history is unavailable.'));
+  } else {
+    box.replaceChildren();
+  }
+  box.hidden = !box.childNodes.length;
+  scroller.scrollTop = scroller.scrollHeight - fromBottom;
+  // The scroll event this causes is not the reader arriving anywhere.
+  mirrorScrollTop = scroller.scrollTop;
+}
+
+function openInlineHistory() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !activePane) return;
+  inlineHistory.open = true;
+  inlineHistory.armed = false;
+  history_.loading = false;  // an answer still in flight belongs to a list this request replaces
+  loadHistory();
+}
+
+function closeInlineHistory() {
+  inlineHistory.open = false;
+  inlineHistory.armed = false;
+  renderInlineHistory();
+}
+
+function inlineHistoryUnavailable(reason) {
+  inlineHistory.reason = reason;
+  inlineHistory.open = false;
+  inlineHistory.armed = false;
+  reachedTopOfOutput();
+  renderInlineHistory();
+}
+
+// The top of the output, and what is behind it depends on the pane. A terminal has its ring. An
+// agent has a transcript, which is the real conversation, and only when there is none does its
+// ring get a turn.
+function reachedTopOfOutput() {
+  const agent = agents.some(a => a.pane_id === activePane);
+  if (agent && !inlineHistory.reason) {
+    if (inlineHistory.open) loadOlderHistory();
+    else openInlineHistory();
+    return;
+  }
+  if (canLoadMore()) loadMore();
+  else if (agent) inlineHistory.hint = true;
+}
+
+function inlineHistoryScrolled() {
+  if (!inlineHistory.open) return;
+  if (userScrolledUp) { inlineHistory.armed = true; return; }
+  if (!inlineHistory.armed) return;
+  if (selectionInside(document.getElementById('termInlineHistory'))) return;
+  closeInlineHistory();
+}
+
+function readingInlineHistory() {
+  if (!inlineHistory.open) return false;
+  const box = document.getElementById('termInlineHistory');
+  return document.getElementById('termScroll').scrollTop < box.offsetHeight;
+}
+
+// A real switch. The answer for the pane being left is dropped on arrival, so the loading flag has
+// to go here or the next pane could never ask.
+function resetInlineHistory() {
+  inlineHistory.reason = null;
+  inlineHistory.hint = false;
+  history_.loading = false;
+  closeInlineHistory();
+}
+
+// A new socket will never answer what the old one was asked.
+function historyConnectionReset() {
+  if (!history_.loading) return;
+  history_.loading = false;
+  if (inlineHistory.open) closeInlineHistory();
 }
 
 // Why the history panel is empty, in the user's terms. Each is an ordinary state, not an error.
 const HISTORY_UNAVAILABLE = {
-  'no-session': 'This pane names no agent session, so there is no transcript to read.',
+  'no-session': 'This agent has not reported a session, so its conversation cannot be read here. Only the terminal output is available.',
   'no-log': 'No transcript file was found for this pane\'s session yet.',
   'unsupported': 'This relay cannot read this agent\'s transcript format yet.',
   'disabled': 'Transcript history is switched off on this relay.',
@@ -563,9 +691,17 @@ function renderHistory() {
     ? `${shown.length} in ${history_.turns.length} loaded`
     : (history_.total ? `${history_.turns.length} of ${history_.total}` : '');
   if (!history_.turns.length) {
-    el.innerHTML = '<div class="hist-edge">This conversation has no turns yet.</div>';
+    const copy = history_.loading ? 'Loading…' : 'This conversation has no turns yet.';
+    el.innerHTML = `<div class="hist-edge">${copy}</div>`;
     return;
   }
+  const out = historyListFragment(shown);
+  if (!shown.length) out.appendChild(histEdge('No loaded turn matches that.'));
+  el.replaceChildren(out);
+}
+
+// The turns, led by whatever sits at the older end of them. Both views draw this.
+function historyListFragment(shown) {
   const out = document.createDocumentFragment();
   if (history_.loading) out.appendChild(histEdge('Loading older…'));
   else if (history_.hasMore) {
@@ -577,9 +713,8 @@ function renderHistory() {
   }
   else if (history_.fileTruncated) out.appendChild(histEdge('Older turns were not fetched from this host.'));
   else out.appendChild(histEdge('Start of the conversation.'));
-  if (shown.length) shown.forEach(turn => out.appendChild(historyTurnNode(turn)));
-  else out.appendChild(histEdge('No loaded turn matches that.'));
-  el.replaceChildren(out);
+  shown.forEach(turn => out.appendChild(historyTurnNode(turn)));
+  return out;
 }
 
 function histEdge(text) {

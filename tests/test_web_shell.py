@@ -261,6 +261,15 @@ class WebShellPaneSessionTests(unittest.TestCase):
         self.assertNotEqual(
             self.page.eval_on_selector(".history-btn", "e => getComputedStyle(e).display"), "none")
 
+    def test_an_agent_herdr_names_no_session_for_keeps_the_history_button(self):
+        """has_session says what herdr reported, not whether the relay can find the transcript."""
+        self.page.evaluate("""() => {
+            agents.find(a => a.pane_id === 'wE:pH').has_session = false;
+            openTerminal('wE:pH');
+        }""")
+        self.assertNotEqual(
+            self.page.eval_on_selector(".history-btn", "e => getComputedStyle(e).display"), "none")
+
     def test_scrollback_is_offered_where_there_is_a_ring_and_not_where_there_is_none(self):
         """`canLoadMore` asks what a read could return, which is the one thing scrollback says.
 

@@ -181,13 +181,34 @@ let imeComposing = false, imeEndedAt = 0;
 // each answer a different content that replaced the mirror under the reader's hands. Only a
 // vertical move that ARRIVES at the top is a request for more.
 let mirrorScrollTop = 0;
-document.getElementById('termContent').addEventListener('scroll', function() {
+document.getElementById('termScroll').addEventListener('scroll', function() {
   const el = this;
   userScrolledUp = (el.scrollHeight - el.scrollTop - el.clientHeight) > 50;
   const moved = el.scrollTop !== mirrorScrollTop;
   mirrorScrollTop = el.scrollTop;
-  if (moved && el.scrollTop === 0 && el.scrollHeight > el.clientHeight) loadMore();
+  inlineHistoryScrolled();
+  // A little slack once the conversation is up, as the panel has, so a page starts loading a moment
+  // before the reader hits the edge.
+  const edge = inlineHistory.open ? 4 : 0;
+  if (moved && el.scrollTop <= edge && el.scrollHeight > el.clientHeight) reachedTopOfOutput();
 });
+// When the whole screen fits in the box -- a tall desktop window -- nothing can scroll, so no scroll
+// event will ever fire. The gesture itself is the only signal there is. Agent panes only, and only
+// for the first request: a wheel fires many times per notch, and each one must not page a ring.
+function pullAtTopOfOutput() {
+  const el = document.getElementById('termScroll');
+  if (el.scrollHeight > el.clientHeight) return;
+  if (agents.some(a => a.pane_id === activePane) && !inlineHistory.open && !inlineHistory.reason) {
+    reachedTopOfOutput();
+  }
+}
+let termTouchY = null;
+const termScrollEl = document.getElementById('termScroll');
+termScrollEl.addEventListener('wheel', e => { if (e.deltaY < 0) pullAtTopOfOutput(); }, { passive: true });
+termScrollEl.addEventListener('touchstart', e => { termTouchY = e.touches[0].clientY; }, { passive: true });
+termScrollEl.addEventListener('touchmove', e => {
+  if (termTouchY !== null && e.touches[0].clientY - termTouchY > 40) { termTouchY = null; pullAtTopOfOutput(); }
+}, { passive: true });
 document.getElementById('historyContent').addEventListener('scroll', function() {
   if (this.scrollTop <= 4) loadOlderHistory();
 });

@@ -299,93 +299,93 @@ body { font-family: var(--font-mono); background: var(--bg); color: var(--text);
    screen, 9.5%, spent before a single turn had rendered -- and the filter, which is only wanted
    while you are looking for something, paid for its input box permanently. The Find chip now opens
    the input IN PLACE of the title, so the row is the same height either way: 80px -> 35px. */
-.term-history .hist-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.term-history .hist-close { height: 22px; background: none; border: none; padding: 0; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
-.term-history .hist-title { font-size: 0.8rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-history .hist-toggle { height: 22px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.65rem; padding: 0 8px; cursor: pointer; }
-.term-history .hist-toggle[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+:is(.term-history, .term-inline) .hist-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+:is(.term-history, .term-inline) .hist-close { height: 22px; background: none; border: none; padding: 0; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
+:is(.term-history, .term-inline) .hist-title { font-size: 0.8rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.term-history, .term-inline) .hist-toggle { height: 22px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.65rem; padding: 0 8px; cursor: pointer; }
+:is(.term-history, .term-inline) .hist-toggle[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
 /* Same 22px as the chips beside it: the row's height is set by its tallest child, so an input
    even two pixels taller than a chip would make the header jump every time the filter opened. */
-.term-history .hist-find { flex: 1; min-width: 0; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.75rem; }
-.term-history .hist-find:focus { outline: none; border-color: var(--blue); }
-.term-history .hist-count { font-size: 0.65rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+:is(.term-history, .term-inline) .hist-find { flex: 1; min-width: 0; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.75rem; }
+:is(.term-history, .term-inline) .hist-find:focus { outline: none; border-color: var(--blue); }
+:is(.term-history, .term-inline) .hist-count { font-size: 0.65rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* `overscroll-behavior: contain`, for the same reason `.term-content` carries it: at the top of the
    list a downward drag chained to the document and handed Chrome its pull-to-refresh, which reloads
    the whole app -- losing the open session, the panel, and however far back you had paged. The
    gesture now stops at the panel, exactly as it already did over the terminal. */
-.term-history .hist-body { flex: 1; overflow-y: auto; padding: 12px; font-size: 0.8rem; line-height: 1.5; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.term-history .hist-edge { color: var(--muted); font-size: 0.7rem; text-align: center; padding: 8px 4px; }
-.term-history .hist-more { display: block; width: 100%; padding: 8px; margin-bottom: 8px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--blue); font-size: 0.75rem; cursor: pointer; }
-.term-history .hist-more:disabled { color: var(--muted); cursor: default; }
+:is(.term-history, .term-inline) .hist-body { flex: 1; overflow-y: auto; padding: 12px; font-size: 0.8rem; line-height: 1.5; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+:is(.term-history, .term-inline) .hist-edge { color: var(--muted); font-size: 0.7rem; text-align: center; padding: 8px 4px; }
+:is(.term-history, .term-inline) .hist-more { display: block; width: 100%; padding: 8px; margin-bottom: 8px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--blue); font-size: 0.75rem; cursor: pointer; }
+:is(.term-history, .term-inline) .hist-more:disabled { color: var(--muted); cursor: default; }
 /* A conversation, not a log: who said what has to read at a glance, so a person's turn is a
    tinted bubble on its own side and the agent's is full width. Both are markdown (see
    mdFragment), which is why nothing here sets `white-space: pre-wrap` on the whole block --
    only fenced code and diffs keep their own whitespace. */
-.term-history .msg { padding: 8px 0; border-bottom: none; }
-.term-history .msg-role { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; display: flex; gap: 6px; align-items: baseline; }
-.term-history .msg-time { font-weight: 400; text-transform: none; color: var(--muted); font-size: 0.65rem; font-variant-numeric: tabular-nums; }
-.term-history .msg-user { color: var(--blue); }
-.term-history .msg-assistant { color: var(--green); }
-.term-history .msg-text { word-break: break-word; }
-.term-history .msg.user { max-width: 88%; margin-left: auto; }
-.term-history .msg.user .msg-role { justify-content: flex-end; }
-.term-history .msg.user .msg-text { background: color-mix(in srgb, var(--blue) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--border)); border-radius: 12px 12px 3px 12px; padding: 8px 11px; }
-.term-history .msg.assistant + .msg.assistant .msg-role { display: none; }
-.term-history .msg.note { max-width: 92%; margin: 0 auto; }
-.term-history .msg.note .msg-text { color: var(--muted); font-size: 0.75rem; border-left: 2px solid var(--border); padding-left: 8px; }
-.term-history .msg-clip { color: var(--orange); font-size: 0.65rem; }
+:is(.term-history, .term-inline) .msg { padding: 8px 0; border-bottom: none; }
+:is(.term-history, .term-inline) .msg-role { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; display: flex; gap: 6px; align-items: baseline; }
+:is(.term-history, .term-inline) .msg-time { font-weight: 400; text-transform: none; color: var(--muted); font-size: 0.65rem; font-variant-numeric: tabular-nums; }
+:is(.term-history, .term-inline) .msg-user { color: var(--blue); }
+:is(.term-history, .term-inline) .msg-assistant { color: var(--green); }
+:is(.term-history, .term-inline) .msg-text { word-break: break-word; }
+:is(.term-history, .term-inline) .msg.user { max-width: 88%; margin-left: auto; }
+:is(.term-history, .term-inline) .msg.user .msg-role { justify-content: flex-end; }
+:is(.term-history, .term-inline) .msg.user .msg-text { background: color-mix(in srgb, var(--blue) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--border)); border-radius: 12px 12px 3px 12px; padding: 8px 11px; }
+:is(.term-history, .term-inline) .msg.assistant + .msg.assistant .msg-role { display: none; }
+:is(.term-history, .term-inline) .msg.note { max-width: 92%; margin: 0 auto; }
+:is(.term-history, .term-inline) .msg.note .msg-text { color: var(--muted); font-size: 0.75rem; border-left: 2px solid var(--border); padding-left: 8px; }
+:is(.term-history, .term-inline) .msg-clip { color: var(--orange); font-size: 0.65rem; }
 
 /* Markdown. Measured shares of the assistant text blocks on this machine: inline code 43.8%,
    bold 32.6%, bullets 11.2%, headings 10.3%, tables 8.7%, ordered lists 5.7%, fences 5.2%. */
-.term-history .msg-text > :first-child { margin-top: 0; }
-.term-history .msg-text > :last-child { margin-bottom: 0; }
-.term-history .msg-text p { margin: 0 0 8px; line-height: 1.5; white-space: pre-wrap; }
-.term-history .msg-text .md-h { font-weight: 600; margin: 12px 0 6px; line-height: 1.3; }
-.term-history .msg-text .md-h1, .term-history .msg-text .md-h2 { font-size: 0.95rem; }
-.term-history .msg-text .md-h3 { font-size: 0.88rem; }
-.term-history .msg-text .md-h4, .term-history .msg-text .md-h5, .term-history .msg-text .md-h6 { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.term-history .msg-text code { font-family: var(--font-mono); font-size: 0.82em; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 4px; padding: 1px 4px; }
-.term-history .msg-text pre { margin: 0 0 8px; padding: 9px 11px; background: color-mix(in srgb, var(--text) 6%, var(--bg)); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
-.term-history .msg-text pre code { background: none; padding: 0; font-size: 0.75rem; line-height: 1.45; white-space: pre; }
-.term-history .msg-text ul, .term-history .msg-text ol { margin: 0 0 8px; padding-left: 20px; line-height: 1.5; }
-.term-history .msg-text li { margin: 2px 0; }
-.term-history .msg-text blockquote { margin: 0 0 8px; padding: 2px 0 2px 10px; border-left: 3px solid color-mix(in srgb, var(--blue) 40%, var(--border)); color: var(--muted); white-space: pre-wrap; }
-.term-history .msg-text hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-.term-history .msg-text a { color: var(--blue); }
-.term-history .msg-text .md-table { overflow-x: auto; margin: 0 0 8px; }
-.term-history .msg-text table { border-collapse: collapse; font-size: 0.78rem; }
-.term-history .msg-text th, .term-history .msg-text td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top; }
-.term-history .msg-text th { background: color-mix(in srgb, var(--text) 6%, transparent); font-weight: 600; white-space: nowrap; }
+:is(.term-history, .term-inline) .msg-text > :first-child { margin-top: 0; }
+:is(.term-history, .term-inline) .msg-text > :last-child { margin-bottom: 0; }
+:is(.term-history, .term-inline) .msg-text p { margin: 0 0 8px; line-height: 1.5; white-space: pre-wrap; }
+:is(.term-history, .term-inline) .msg-text .md-h { font-weight: 600; margin: 12px 0 6px; line-height: 1.3; }
+:is(.term-history, .term-inline) .msg-text .md-h1, .term-history .msg-text .md-h2 { font-size: 0.95rem; }
+:is(.term-history, .term-inline) .msg-text .md-h3 { font-size: 0.88rem; }
+:is(.term-history, .term-inline) .msg-text .md-h4, .term-history .msg-text .md-h5, .term-history .msg-text .md-h6 { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+:is(.term-history, .term-inline) .msg-text code { font-family: var(--font-mono); font-size: 0.82em; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 4px; padding: 1px 4px; }
+:is(.term-history, .term-inline) .msg-text pre { margin: 0 0 8px; padding: 9px 11px; background: color-mix(in srgb, var(--text) 6%, var(--bg)); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+:is(.term-history, .term-inline) .msg-text pre code { background: none; padding: 0; font-size: 0.75rem; line-height: 1.45; white-space: pre; }
+:is(.term-history, .term-inline) .msg-text ul, .term-history .msg-text ol { margin: 0 0 8px; padding-left: 20px; line-height: 1.5; }
+:is(.term-history, .term-inline) .msg-text li { margin: 2px 0; }
+:is(.term-history, .term-inline) .msg-text blockquote { margin: 0 0 8px; padding: 2px 0 2px 10px; border-left: 3px solid color-mix(in srgb, var(--blue) 40%, var(--border)); color: var(--muted); white-space: pre-wrap; }
+:is(.term-history, .term-inline) .msg-text hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+:is(.term-history, .term-inline) .msg-text a { color: var(--blue); }
+:is(.term-history, .term-inline) .msg-text .md-table { overflow-x: auto; margin: 0 0 8px; }
+:is(.term-history, .term-inline) .msg-text table { border-collapse: collapse; font-size: 0.78rem; }
+:is(.term-history, .term-inline) .msg-text th, .term-history .msg-text td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top; }
+:is(.term-history, .term-inline) .msg-text th { background: color-mix(in srgb, var(--text) 6%, transparent); font-weight: 600; white-space: nowrap; }
 
 /* A tool call still earns one line -- on the biggest session measured here 674 of 794 turns were
    tool calls -- but a file edit now opens into its diff. */
-.term-history .msg.tool { padding: 2px 0; }
-.term-history .msg.tool .tool-head { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
+:is(.term-history, .term-inline) .msg.tool { padding: 2px 0; }
+:is(.term-history, .term-inline) .msg.tool .tool-head { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
 .term-history details.msg.tool > .tool-head { cursor: pointer; list-style: none; }
 .term-history details.msg.tool > .tool-head::-webkit-details-marker { display: none; }
 .term-history details.msg.tool > .tool-head::before { content: '\25b8'; flex-shrink: 0; transition: transform 0.15s; }
 .term-history details.msg.tool[open] > .tool-head::before { transform: rotate(90deg); }
-.term-history .msg.tool .tool-name { color: var(--text); font-weight: 600; flex-shrink: 0; }
-.term-history .msg.tool.failed .tool-name { color: var(--red); }
+:is(.term-history, .term-inline) .msg.tool .tool-name { color: var(--text); font-weight: 600; flex-shrink: 0; }
+:is(.term-history, .term-inline) .msg.tool.failed .tool-name { color: var(--red); }
 /* min-width: 0 or the target refuses to shrink and pushes the +/- count off the panel. */
-.term-history .msg.tool .tool-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-history .msg.tool .tool-error { color: var(--red); flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-history .msg.tool .tool-stat { flex-shrink: 0; display: flex; gap: 4px; font-variant-numeric: tabular-nums; }
-.term-history .msg.tool .stat-add { color: var(--green); }
-.term-history .msg.tool .stat-del { color: var(--red); }
+:is(.term-history, .term-inline) .msg.tool .tool-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.term-history, .term-inline) .msg.tool .tool-error { color: var(--red); flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.term-history, .term-inline) .msg.tool .tool-stat { flex-shrink: 0; display: flex; gap: 4px; font-variant-numeric: tabular-nums; }
+:is(.term-history, .term-inline) .msg.tool .stat-add { color: var(--green); }
+:is(.term-history, .term-inline) .msg.tool .stat-del { color: var(--red); }
 
 /* The diff. Whitespace is load-bearing here, and the +/- marker lives in its own gutter so the
    code keeps its real indentation. */
-.term-history .diff { margin: 4px 0 8px 14px; border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.7rem; line-height: 1.45; }
-.term-history .diff-line { white-space: pre; padding-right: 8px; }
-.term-history .diff-line::before { content: attr(data-mark); display: inline-block; width: 1.4em; text-align: center; color: var(--muted); user-select: none; }
-.term-history .diff-line.add { background: color-mix(in srgb, var(--green) 14%, transparent); }
-.term-history .diff-line.add::before { color: var(--green); }
-.term-history .diff-line.del { background: color-mix(in srgb, var(--red) 14%, transparent); }
-.term-history .diff-line.del::before { color: var(--red); }
-.term-history .diff-line.gap { color: var(--muted); text-align: center; background: color-mix(in srgb, var(--text) 4%, transparent); }
-.term-history .diff-line.gap::before { content: none; }
-.term-history .diff-edge { font-size: 0.65rem; color: var(--orange); margin: -4px 0 8px 14px; }
+:is(.term-history, .term-inline) .diff { margin: 4px 0 8px 14px; border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.7rem; line-height: 1.45; }
+:is(.term-history, .term-inline) .diff-line { white-space: pre; padding-right: 8px; }
+:is(.term-history, .term-inline) .diff-line::before { content: attr(data-mark); display: inline-block; width: 1.4em; text-align: center; color: var(--muted); user-select: none; }
+:is(.term-history, .term-inline) .diff-line.add { background: color-mix(in srgb, var(--green) 14%, transparent); }
+:is(.term-history, .term-inline) .diff-line.add::before { color: var(--green); }
+:is(.term-history, .term-inline) .diff-line.del { background: color-mix(in srgb, var(--red) 14%, transparent); }
+:is(.term-history, .term-inline) .diff-line.del::before { color: var(--red); }
+:is(.term-history, .term-inline) .diff-line.gap { color: var(--muted); text-align: center; background: color-mix(in srgb, var(--text) 4%, transparent); }
+:is(.term-history, .term-inline) .diff-line.gap::before { content: none; }
+:is(.term-history, .term-inline) .diff-edge { font-size: 0.65rem; color: var(--orange); margin: -4px 0 8px 14px; }
 .term-search { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .term-search input { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.85rem; }
 .term-search input:focus { outline: none; border-color: var(--blue); }
@@ -403,7 +403,18 @@ body { font-family: var(--font-mono); background: var(--bg); color: var(--text);
 .session-item.active { border-color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--bg)); }
 .session-name { font-weight: 500; flex: 1; }
 .session-url { font-size: 0.7rem; color: var(--muted); font-family: var(--font-mono); }
-.term-content { flex: 1; min-width: 0; overflow: auto; padding: 10px 12px; background: var(--term-bg); color-scheme: dark; font-family: var(--font-term); font-size: clamp(0.68rem, 2.7vw, 0.8rem); line-height: 1.35; white-space: pre; color: var(--term-text); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* The vertical scroller holds the conversation above the terminal, so the two read as one page. The
+   mirror keeps sideways scrolling for itself: a long line must not carry the turns off screen. */
+.term-scroll { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; background: var(--term-bg); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* Dark under every theme, because it reads as one page with the mirror below it. The tokens are
+   restated as the dark palette's values rather than left to `color-scheme`: a custom palette sets
+   them on the root as plain colours, and its dark text would land on this dark ground. */
+.term-inline { flex: none; padding: 12px 12px 0; color-scheme: dark; background: var(--term-bg); color: var(--term-text); font-size: 0.8rem; line-height: 1.5;
+  --bg: #0a0a0a; --surface: #171717; --border: #2e2e2e; --text: #fafafa; --muted: #a1a1a1;
+  --green: #4ac777; --red: #ff5e5e; --blue: #59aaf8; --orange: #f4b93c; --on-accent: #0a0a0a; }
+.term-inline[hidden] { display: none; }
+.term-inline .hist-live { margin: 8px -12px 0; padding: 4px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.65rem; text-align: center; }
+.term-content { flex: 1 0 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; background: var(--term-bg); color-scheme: dark; font-family: var(--font-term); font-size: clamp(0.68rem, 2.7vw, 0.8rem); line-height: 1.35; white-space: pre; color: var(--term-text); -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .quick-actions { padding: 6px 10px; border-top: 1px solid var(--border); display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
 .quick-actions button { padding: 8px 12px; border-radius: 8px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; flex: 1; min-width: 70px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 /* A full option label ("Yes, and don't ask again for ...") cannot share a row with three more of
@@ -520,7 +531,7 @@ body { font-family: var(--font-mono); background: var(--bg); color: var(--text);
   .section-header { grid-column: 1 / -1; }
   .tab-heading, .empty-tab { grid-column: 1 / -1; }
   .chip-strip { grid-column: 1 / -1; }
-  .term-content { min-height: 400px; }
+  .term-scroll { min-height: 400px; }
 }
 @media (min-width: 1200px) {
   body { max-width: 1100px; }

@@ -141,17 +141,21 @@ function handleMessage(msg) {
     // guard catches neither, and the line the reader is selecting inside can still be the line
     // mirrorPatch has to rewrite.
     if (selectionInside(el)) return;
-    const prevHeight = el.scrollHeight;
-    const prevScroll = el.scrollTop;
+    const scroller = document.getElementById('termScroll');
+    const prevHeight = scroller.scrollHeight;
+    const prevScroll = scroller.scrollTop;
     // Nothing moved, so nothing here may move either -- not the DOM, and not the scroll, which the
     // fix-up below would otherwise yank to the bottom every 3s.
     if (!mirrorPatch(el, msg.content || '(empty)')) return;
     if (userScrolledUp) {
+      // A reader up in the conversation is above everything that just changed, so nothing they are
+      // looking at moved, and the adjustment below would be the only thing that moves it.
+      if (readingInlineHistory()) return;
       // Keep scroll position relative to bottom (content may have grown at top)
-      const growth = el.scrollHeight - prevHeight;
-      el.scrollTop = prevScroll + growth;
+      const growth = scroller.scrollHeight - prevHeight;
+      scroller.scrollTop = prevScroll + growth;
     } else {
-      el.scrollTop = el.scrollHeight;
+      scroller.scrollTop = scroller.scrollHeight;
     }
   } else if (msg.type === 'history' && msg.pane_id === activePane) {
     receiveHistory(msg);

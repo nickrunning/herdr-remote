@@ -428,7 +428,8 @@ function clearPaneMirror() {
   if (sel && sel.rangeCount && el.contains(sel.anchorNode)) sel.removeAllRanges();
   el.__mirror = null;   // mirrorPatch reconciles against this, and it now describes another pane
   el.replaceChildren(document.createTextNode('Loading…'));
-  el.scrollTop = 0;
+  el.scrollLeft = 0;
+  document.getElementById('termScroll').scrollTop = 0;
 }
 
 // The approval dock is built by openTerminal, which is only re-entered on a `blocked` message --
@@ -492,7 +493,7 @@ function openTerminal(paneId) {
   // resetting it on one would drop a reader who had paged back to the live screen the moment
   // their agent asked a question -- the one moment they are most likely to be reading.
   if (activePane !== paneId) {
-    hideHistory(); hideSearch(); clearPaneMirror(); hideSendError();
+    hideHistory(); hideSearch(); resetInlineHistory(); clearPaneMirror(); hideSendError();
     // The path an upload returns belongs in THIS pane's reply, and the box serves every pane. Back
     // cancels nothing, so a file still going up for this pane goes on, and one that landed while
     // the reader was away goes into the box now -- after hideSendError, so its notice stays.
@@ -511,10 +512,11 @@ function openTerminal(paneId) {
   document.getElementById('termTitle').textContent = a
     ? `${a.label||a.workspace_label||a.project} · ${a.agent}`
     : shell ? `${shell.label||shell.project||shell.pane_id} · ${shell.pane_id}` : paneId;
-  // A pane that names no agent session has no transcript to show. `false` only -- undefined means
-  // the relay doesn't report it, and the button stays. A terminal never has one.
+  // A terminal never has a transcript. An agent keeps the button even with `has_session: false`:
+  // that only says herdr reported no session, and the relay can often find one anyway. When it
+  // cannot, the panel says why.
   const historyBtn = document.querySelector('.history-btn');
-  if (historyBtn) historyBtn.style.display = (shell || (a && a.has_session === false)) ? 'none' : '';
+  if (historyBtn) historyBtn.style.display = shell ? 'none' : '';
   renderSiblings();
   document.getElementById('agentListView').style.display = 'none';
   if (refreshInterval) clearInterval(refreshInterval);

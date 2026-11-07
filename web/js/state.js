@@ -248,6 +248,7 @@ function connect() {
   ws = sock;
   sock.onopen = () => { if (ws !== sock) return; setStatus('connected'); if(window.cue) cue('ready');
     resumeUploads();
+    historyConnectionReset();
     // Push: the relay's copy of this device's subscription can be stale (see push.js).
     if (typeof resyncPushSubscription === 'function') resyncPushSubscription(); };
   sock.onclose = () => { if (ws !== sock) return; setStatus('disconnected');

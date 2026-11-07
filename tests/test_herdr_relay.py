@@ -3438,6 +3438,62 @@ class RelayPaneFieldTests(unittest.TestCase):
         self.assertEqual(payload["total"], 2)
         self.assertFalse(payload["has_more"])
 
+    PROCESS_INFO = json.dumps({"result": {"process_info": {"foreground_processes": [
+        {"name": "python3", "pid": 41}, {"name": "claude", "pid": 42},
+    ]}}})
+
+    def _history_by_pid(self, relay, root, agent="claude"):
+        """One get_history for a pane herdr names no session for, with claude's own files on disk."""
+        pane_id = "w0:p1"
+        session_id = "1b3d9f8a-2c4e-4a6b-8d0f-112233445566"
+        row = {"type": "user", "uuid": "u1", "timestamp": "2026-08-21T00:00:00Z",
+               "message": {"role": "user", "content": "found by pid"}}
+        project = Path(root) / "projects" / "-home-someone-project"
+        project.mkdir(parents=True)
+        (project / f"{session_id}.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+        sessions = Path(root) / "sessions"
+        sessions.mkdir()
+        (sessions / "42.json").write_text(
+            json.dumps({"pid": 42, "sessionId": session_id}), encoding="utf-8")
+        relay.transcript.LOCAL_ROOTS = [str(Path(root) / "projects")]
+        relay.transcript.cache_clear()
+        relay.known_panes.add(pane_id)
+        relay.agent_cache[pane_id] = {"pane_id": pane_id, "agent": agent, "has_session": False}
+        ws = _FakeWebSocket([json.dumps({"type": "get_history", "pane_id": pane_id})])
+        with mock.patch.object(relay, "send_current_snapshot", new=mock.AsyncMock()), \
+             mock.patch.object(relay, "run_herdr", return_value=self.PROCESS_INFO) as run:
+            asyncio.run(relay.handle_client(ws))
+        return json.loads(ws.sent[0]), run
+
+    def test_get_history_finds_a_claude_pane_herdr_names_no_session_for(self):
+        with loaded_relay() as relay, tempfile.TemporaryDirectory() as root:
+            payload, run = self._history_by_pid(relay, root)
+            self.assertEqual(payload["unavailable"], None)
+            self.assertEqual([m["text"] for m in payload["messages"]], ["found by pid"])
+            run.assert_called_once_with("pane", "process-info", "--pane", "w0:p1", remote=None)
+            # The upload sweep reads the ref herdr reported. A found ref must not pose as one.
+            self.assertNotIn("w0:p1", relay.pane_session_map)
+            self.assertFalse(relay.agent_cache["w0:p1"]["has_session"])
+
+    def test_get_history_only_looks_for_a_pid_file_under_claude(self):
+        with loaded_relay() as relay, tempfile.TemporaryDirectory() as root:
+            payload, run = self._history_by_pid(relay, root, agent="agy")
+            self.assertEqual(payload["unavailable"], "no-session")
+            run.assert_not_called()
+
+    def test_get_history_does_not_look_when_transcripts_are_switched_off(self):
+        with loaded_relay() as relay, tempfile.TemporaryDirectory() as root:
+            with mock.patch.object(relay.transcript, "ENABLED", False):
+                payload, run = self._history_by_pid(relay, root)
+            self.assertEqual(payload["unavailable"], "disabled")
+            run.assert_not_called()
+
+    def test_get_history_says_no_session_when_the_process_read_fails(self):
+        for answer in ("", "{}", json.dumps({"error": {"code": "pane_not_found"}})):
+            with self.subTest(answer=answer), loaded_relay() as relay:
+                with mock.patch.object(relay, "run_herdr", return_value=answer):
+                    self.assertIsNone(relay.session_from_pane_process("w0:p1"))
+
     def test_get_history_reads_codex_rollouts_locally_and_over_ssh(self):
         pane_id = "w0:p1"
         session_id = "1b3d9f8a-2c4e-4a6b-8d0f-112233445566"

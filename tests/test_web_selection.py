@@ -577,10 +577,10 @@ class WebMirrorPatchTests(unittest.TestCase, _Selecting):
     def test_an_unchanged_tick_does_not_yank_the_scroll_either(self):
         """The fix-up below the patch pins an unscrolled mirror to the bottom. Running it on a tick
         that changed nothing is how a reader who nudged the view got pulled back every 3s."""
-        self.page.evaluate("document.getElementById('termContent').scrollTop = 20")
+        self.page.evaluate("document.getElementById('termScroll').scrollTop = 20")
         self.page.evaluate("""body => handleMessage(
           {type: 'pane_content', pane_id: 'wB:pH', content: body})""", self.BODY)
-        self.assertEqual(self.page.eval_on_selector("#termContent", "e => e.scrollTop"), 20)
+        self.assertEqual(self.page.eval_on_selector("#termScroll", "e => e.scrollTop"), 20)
 
 
 @unittest.skipIf(sync_playwright is None, "playwright is not installed")
@@ -612,7 +612,7 @@ class WebMirrorScrollAxisTests(unittest.TestCase, _Selecting):
           openTerminal('wB:p2');           // a shell pane: the only kind with a ring to load
           clearInterval(refreshInterval);
           handleMessage({type: 'pane_content', pane_id: 'wB:p2', content: body});
-          document.getElementById('termContent').scrollTop = 0;
+          document.getElementById('termScroll').scrollTop = 0;
           mirrorScrollTop = 0;
           paneLines = 200;
           window.__sent = [];
@@ -623,7 +623,7 @@ class WebMirrorScrollAxisTests(unittest.TestCase, _Selecting):
 
     def scroll(self, **pos):
         self.page.evaluate("""pos => {
-          const el = document.getElementById('termContent');
+          const el = document.getElementById('termScroll');
           Object.assign(el, pos);
           el.dispatchEvent(new Event('scroll'));
         }""", pos)
@@ -646,7 +646,7 @@ class WebMirrorScrollAxisTests(unittest.TestCase, _Selecting):
         scroll event was a request for more lines."""
         self.page.evaluate("""() => {
           handleMessage({type: 'pane_content', pane_id: 'wB:p2', content: 'one\\ntwo'});
-          document.getElementById('termContent').scrollTop = 0;
+          document.getElementById('termScroll').scrollTop = 0;
           mirrorScrollTop = 0;
           window.__sent = [];
         }""")

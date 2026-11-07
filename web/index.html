@@ -135,7 +135,10 @@ document.addEventListener('DOMContentLoaded', () => bind());
     <button onclick="searchNav(1)" aria-label="Next"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
     <button onclick="toggleSearch()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
-  <div class="term-content" id="termContent">Loading…</div>
+  <div class="term-scroll" id="termScroll">
+    <div class="term-inline" id="termInlineHistory" hidden></div>
+    <div class="term-content" id="termContent">Loading…</div>
+  </div>
   <div class="quick-actions" id="quickActions"></div>
   <div class="qa-hint qa-error send-error" id="sendError" role="alert" hidden></div>
   <div class="term-input">
